@@ -10,6 +10,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.Path;
@@ -27,11 +28,20 @@ import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.google.android.exoplayer2.Player;
+import com.google.android.play.core.splitinstall.SplitInstallManager;
+import com.google.android.play.core.splitinstall.SplitInstallManagerFactory;
+import com.google.android.play.core.splitinstall.SplitInstallRequest;
+import com.google.android.play.core.splitinstall.SplitInstallSessionState;
+import com.google.android.play.core.splitinstall.SplitInstallStateUpdatedListener;
+import com.google.android.play.core.splitinstall.model.SplitInstallSessionStatus;
+import com.google.android.play.core.tasks.OnFailureListener;
+import com.google.android.play.core.tasks.OnSuccessListener;
 
 import java.io.File;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +53,7 @@ import in.sdtechnocrat.musicplayer.utils.BitmapUtils;
 import in.sdtechnocrat.musicplayer.utils.Util;
 import me.tankery.lib.circularseekbar.CircularSeekBar;
 
+import static in.sdtechnocrat.musicplayer.utils.Util.SHARED_PREFS;
 import static in.sdtechnocrat.musicplayer.utils.Util.playbackState;
 
 public class NowPlayingActivityOne extends AppCompatActivity implements PlayerService.MusicPlayerListener {
@@ -53,16 +64,23 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
 
     boolean mBound = false;
 
-    ImageView albumArt, btnPrev, btnPlay, btnPause, btnNext;
+    ImageView albumArt, btnPrev, btnPlay, btnPause, btnNext, btnSwitchVideo, btnPlaylist;
     Animation rotation;
     CircularSeekBar progressBar;
     TextView textDuration, textProgress;
     ImageView fullScreenLayout;
 
+    private int mySessionId;
+    private boolean isVideoPlayerAvailable = false;
+    SharedPreferences sharedPreferences;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_now_playing_one);
+
+        sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
+        isVideoPlayerAvailable = sharedPreferences.getBoolean("isVideoPlayerAvailable", false);
 
         albumArt = findViewById(R.id.albumArt);
         btnPrev = findViewById(R.id.btnPrev);
@@ -73,6 +91,8 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
         textDuration = findViewById(R.id.textDuration);
         textProgress = findViewById(R.id.textProgress);
         fullScreenLayout = findViewById(R.id.fullScreenLayout);
+        btnSwitchVideo = findViewById(R.id.btnSwitchVideo);
+        btnPlaylist = findViewById(R.id.btnPlaylist);
 
 
         rotation = AnimationUtils.loadAnimation(this, R.anim.rotate);
@@ -103,6 +123,17 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
                changeWidget();
            }*/
         });
+
+        btnSwitchVideo.setOnClickListener((view -> {
+            if (isVideoPlayerAvailable) {
+                Intent intent = new Intent();
+                intent.setClassName("in.sdtechnocrat.musicplayer", "com.example.videoplayer.VideoPlayer");
+                startActivity(intent);
+            } else {
+                downloadDynamicModule();
+            }
+        }));
+
 
         progressBar.setOnSeekBarChangeListener(new CircularSeekBar.OnCircularSeekBarChangeListener() {
             @Override
@@ -207,28 +238,40 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
 
             SongData currentSongData = Util.currentSong;
 
-            File file = new File(currentSongData.getAlbumArt());
+
+            String fileName = "";
+            if (Util.playbackType == Util.PLAYBACK_TYPE.VIDEO) {
+                fileName = Util.currentVideo.getFileName();
+            } else {
+                fileName = currentSongData.getAlbumArt();
+            }
+            File file = new File(fileName);
             Uri photoURI = Uri.fromFile(file);
+            updateWidgetMetaData(photoURI);
 
-            Glide.with(this)
-                    .asBitmap()
-                    .load(photoURI)
-                    .error(R.drawable.album_art)
-                    .placeholder(R.drawable.album_art)
-                    .into(new CustomTarget<Bitmap>() {
-                        @Override
-                        public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                            albumArt.setImageBitmap(convertToHeart(resource));
-                            fullScreenLayout.setImageBitmap(resource);
-
-                        }
-
-                        @Override
-                        public void onLoadCleared(@Nullable Drawable placeholder) {
-
-                        }
-                    });
         }
+    }
+
+    public void updateWidgetMetaData(Uri photoURI) {
+        Glide.with(this)
+                .asBitmap()
+                .load(photoURI)
+                .error(R.drawable.album_art)
+                .placeholder(R.drawable.album_art)
+                .into(new CustomTarget<Bitmap>() {
+                    @Override
+                    public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
+                        albumArt.setImageBitmap(convertToHeart(resource));
+                        fullScreenLayout.setImageBitmap(resource);
+
+                    }
+
+                    @Override
+                    public void onLoadCleared(@Nullable Drawable placeholder) {
+
+                    }
+                });
+
     }
 
 
@@ -258,6 +301,36 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
         private void purgeHandler() {
             handler.removeCallbacks(this);
         }
+    }
+
+
+    private void downloadDynamicModule() {
+        SplitInstallManager splitInstallManager = SplitInstallManagerFactory.create(this);
+
+        SplitInstallRequest request = SplitInstallRequest
+                        .newBuilder()
+                        .addModule("videoplayer")
+                        .build();
+
+        SplitInstallStateUpdatedListener listener = splitInstallSessionState -> {
+            if(splitInstallSessionState.sessionId() == mySessionId) {
+                switch (splitInstallSessionState.status()) {
+                    case SplitInstallSessionStatus.INSTALLED:
+                        Log.d("TAG", "Dynamic Module downloaded");
+                        Toast.makeText(NowPlayingActivityOne.this, "Dynamic Module downloaded", Toast.LENGTH_SHORT).show();
+                        isVideoPlayerAvailable = true;
+                        sharedPreferences.edit().putBoolean("isVideoPlayerAvailable", true).apply();
+                        break;
+                }
+            }
+        };
+
+
+        splitInstallManager.registerListener(listener);
+
+        splitInstallManager.startInstall(request)
+                .addOnFailureListener(e -> Log.d("TAG", "Exception: " + e))
+                .addOnSuccessListener(sessionId -> mySessionId = sessionId);
     }
 
 

@@ -30,6 +30,7 @@ import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.FileProvider;
 
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
@@ -39,6 +40,7 @@ import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.extractor.ExtractorsFactory;
+import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
@@ -59,6 +61,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import in.sdtechnocrat.musicplayer.R;
+import in.sdtechnocrat.musicplayer.model.CustomMetadata;
 import in.sdtechnocrat.musicplayer.model.SongData;
 import in.sdtechnocrat.musicplayer.utils.Util;
 
@@ -85,10 +88,10 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
     private MediaSessionCompat mediaSession;
     private MediaControllerCompat.TransportControls transportControls;
 
-    public enum PlaybackStatus {
-        PLAYING,
-        PAUSED
-    }
+    ExtractorsFactory extractorsFactory;
+    DataSource.Factory dateSourceFactory;
+    ConcatenatingMediaSource concatenatedSource;
+    int position = 0;
 
 
     public PlayerService() {
@@ -168,6 +171,8 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
     @Override
     public void onCreate() {
         super.onCreate();
+        extractorsFactory = new DefaultExtractorsFactory();
+        dateSourceFactory = new DefaultDataSourceFactory(this, null, new DefaultHttpDataSourceFactory(getUserAgent(this), null));
     }
 
     @Override
@@ -194,8 +199,11 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
         BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
         TrackSelection.Factory trackSelectionFactory = new AdaptiveTrackSelection.Factory(bandwidthMeter);
         exoPlayer = ExoPlayerFactory.newSimpleInstance(this, new DefaultTrackSelector(trackSelectionFactory));
+
+        prepareMediaSource();
+
         exoPlayer.addListener(listener);
-        exoPlayer.prepare(prepareMediaSource());
+        exoPlayer.prepare(concatenatedSource);
         exoPlayer.setPlayWhenReady(true);
         Util.playbackState = Util.PLAYBACK_STATE.PLAYING;
 
@@ -204,10 +212,37 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
     }
 
     public MediaSource prepareMediaSource() {
-        final ExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
-        DataSource.Factory dateSourceFactory = new DefaultDataSourceFactory(this, null, new DefaultHttpDataSourceFactory(getUserAgent(this), null));
-        MediaSource mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).createMediaSource(Uri.parse(Util.currentSong.getData()));
+        SongData songData = Util.currentSong;
+        MediaSource mediaSource;
+        if (Util.playbackType == Util.PLAYBACK_TYPE.VIDEO) {
+            mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(Uri.parse(Util.currentVideo.getFileName()));
+        } else {
+            mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(Uri.parse(Util.currentSong.getData()));
+        }
+        Util.playListMetadata = new ArrayList<>();
+        CustomMetadata customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist() + " - " + songData.getAlbum(), songData.getAlbumArt());
+        Util.playListMetadata.add(customMetadata);
+
+
+        concatenatedSource = new ConcatenatingMediaSource(mediaSource);
         return mediaSource;
+    }
+
+
+
+    public void addItem(SongData songData) {
+        Uri uri = Uri.parse(songData.getData());
+        if (position == 0) {
+            position = 1;
+        } else {
+            position++;
+        }
+        CustomMetadata customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist() + " - " + songData.getAlbum(), songData.getAlbumArt());
+        Util.playListMetadata.add(customMetadata);
+        Util.currentCustomMetadata = customMetadata;
+        // Add mediaId (e.g. uri) as tag to the MediaSource.
+        MediaSource mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(uri);
+        concatenatedSource.addMediaSource(mediaSource);
     }
 
     private int millisecondsToString(int milliseconds) {
@@ -285,7 +320,8 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
 
         @Override
         public void onPositionDiscontinuity(int reason) {
-
+            Util.currentCustomMetadata = Util.playListMetadata.get((Integer) exoPlayer.getCurrentTag());
+            notifyPlayerChangeListeners();
         }
 
         @Override

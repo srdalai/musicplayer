@@ -9,6 +9,7 @@ import in.sdtechnocrat.musicplayer.activity.TracksFragment;
 import in.sdtechnocrat.musicplayer.activity.AlbumsFragment;
 import in.sdtechnocrat.musicplayer.activity.ArtistsFragment;
 import in.sdtechnocrat.musicplayer.activity.PlaylistsFragment;
+import in.sdtechnocrat.musicplayer.activity.VideoListFragment;
 
 public class ViewPagerAdapter extends FragmentStatePagerAdapter {
 
@@ -28,13 +29,15 @@ public class ViewPagerAdapter extends FragmentStatePagerAdapter {
                 return new ArtistsFragment();
             case 3:
                 return new PlaylistsFragment();
+            case 4:
+                return new VideoListFragment();
         }
         return null;
     }
 
     @Override
     public int getCount() {
-        return 4;
+        return 5;
     }
 
     @Override public CharSequence getPageTitle(int position) {
@@ -47,6 +50,8 @@ public class ViewPagerAdapter extends FragmentStatePagerAdapter {
                 return "Artists";
             case 3:
                 return "Playlist";
+            case 4:
+                return "Videos";
             default:
                 return null;
         }

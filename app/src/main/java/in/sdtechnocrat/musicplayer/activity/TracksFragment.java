@@ -61,6 +61,9 @@ public class TracksFragment extends Fragment {
                 SongData songData = songList.get(position);
                 Toast.makeText(requireContext(), songData.getTitle(), Toast.LENGTH_SHORT).show();
                 Util.currentSong = songList.get(position);
+
+                Util.playbackType = Util.PLAYBACK_TYPE.AUDIO;
+
                 if (requireContext() instanceof HomeActivity) {
                     ((HomeActivity) requireContext()).playSong();
                 }

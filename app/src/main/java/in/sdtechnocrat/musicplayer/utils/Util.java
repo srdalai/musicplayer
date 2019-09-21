@@ -1,16 +1,24 @@
 package in.sdtechnocrat.musicplayer.utils;
 
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
+import in.sdtechnocrat.musicplayer.model.CustomMetadata;
 import in.sdtechnocrat.musicplayer.model.SongData;
+import in.sdtechnocrat.musicplayer.model.VideoData;
 
 public class Util {
 
     public static String fileUri = "";
     public static SongData currentSong;
+    public static VideoData currentVideo;
+    public static ArrayList<CustomMetadata> playListMetadata;
+    public static CustomMetadata currentCustomMetadata;
 
     public static PLAYBACK_STATE playbackState = PLAYBACK_STATE.NONE;
     public enum PLAYBACK_STATE {NONE, PLAYING, PAUSED, STOPPED, BUFFERING}
+    public enum PLAYBACK_TYPE {NONE, AUDIO, VIDEO}
+    public static PLAYBACK_TYPE playbackType = PLAYBACK_TYPE.NONE;
 
     public static final String ACTION_PLAY = "in.sdtechnocrat.musicplayer.ACTION_PLAY";
     public static final String ACTION_PAUSE = "in.sdtechnocrat.musicplayer.ACTION_PAUSE";
@@ -22,6 +30,7 @@ public class Util {
 
     //AudioPlayer notification ID
     public static final int NOTIFICATION_ID = 101;
+    public static final String SHARED_PREFS = "in.sdtechnocrat.musicplayer.userprefs";
 
 
     public static String convertToTime(String milliSeconds) {

@@ -10,7 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/colorAccent"
-        android:theme="@style/AppTheme.AppBarOverlay">
+        android:theme="@style/AppTheme.AppBarOverlay"
+        android:visibility="visible">
 
         <TextView
             android:id="@+id/title"
@@ -20,7 +21,8 @@
             android:minHeight="?actionBarSize"
             android:padding="@dimen/appbar_padding"
             android:text="@string/app_name"
-            android:textAppearance="@style/TextAppearance.Widget.AppCompat.Toolbar.Title" />
+            android:textAppearance="@style/TextAppearance.Widget.AppCompat.Toolbar.Title"
+            android:visibility="gone" />
 
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabs"
@@ -28,8 +30,7 @@
             android:layout_height="wrap_content"
             android:background="?attr/colorPrimary"
             app:tabIndicatorColor="#ffffff"
-            app:tabSelectedTextColor="@color/colorAccent"
-            tools:visibility="gone" />
+            app:tabSelectedTextColor="@color/colorAccent" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -40,12 +41,13 @@
         android:layout_marginBottom="80dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    <FrameLayout
+    <!--<FrameLayout
         android:id="@+id/nowPlayingFrame"
         android:layout_width="match_parent"
         android:layout_height="80dp"
         android:layout_gravity="bottom"
-        android:background="#ffffff">
+        android:background="#ffffff"
+        android:visibility="gone">
 
         <RelativeLayout
             android:layout_width="match_parent"
@@ -76,6 +78,7 @@
                         android:id="@+id/albumArt"
                         android:layout_width="60dp"
                         android:layout_height="60dp"
+                        android:scaleType="centerCrop"
                         android:src="@drawable/album_art" />
                 </androidx.cardview.widget.CardView>
 
@@ -153,6 +156,8 @@
 
         </RelativeLayout>
 
-    </FrameLayout>
+    </FrameLayout>-->
+
+    <include layout="@layout/home_bottom_sheet_player" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
