@@ -1,8 +1,17 @@
 package in.sdtechnocrat.musicplayer.utils;
 
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Matrix;
+import android.graphics.Path;
+import android.graphics.RectF;
+
+import androidx.core.graphics.PathParser;
+
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
+import in.sdtechnocrat.musicplayer.R;
 import in.sdtechnocrat.musicplayer.model.CustomMetadata;
 import in.sdtechnocrat.musicplayer.model.SongData;
 import in.sdtechnocrat.musicplayer.model.VideoData;
@@ -47,5 +56,26 @@ public class Util {
         }
         returnTime = minStr + ":" + secStr;
         return returnTime;
+    }
+
+    public static Bitmap convertToHeart(Context ctx, Bitmap src) {
+        return BitmapUtils.getCroppedBitmap(src, getHeartPath(ctx, src));
+    }
+
+    private static Path getHeartPath(Context ctx, Bitmap src) {
+        return resizePath(PathParser.createPathFromPathData(ctx.getResources().getString(R.string.albumN)),
+                src.getWidth(), src.getHeight());
+    }
+    private static Path resizePath(Path path, float width, float height) {
+        RectF bounds = new RectF(0, 0, width, height);
+        Path resizedPath = new Path(path);
+        RectF src = new RectF();
+        resizedPath.computeBounds(src, true);
+
+        Matrix resizeMatrix = new Matrix();
+        resizeMatrix.setRectToRect(src, bounds, Matrix.ScaleToFit.CENTER);
+        resizedPath.transform(resizeMatrix);
+
+        return resizedPath;
     }
 }

@@ -33,7 +33,7 @@ public class SplashActivity extends AppCompatActivity {
     ImageView imageView;
 
     Animation rotation;
-
+    String[] permissions = new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.READ_PHONE_STATE};
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,7 +50,7 @@ public class SplashActivity extends AppCompatActivity {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
+                requestPermissions(permissions,MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
             } else {
                 new Handler().postDelayed(new Runnable() {
                     @Override

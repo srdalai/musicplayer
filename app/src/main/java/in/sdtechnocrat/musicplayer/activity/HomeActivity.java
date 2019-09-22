@@ -30,6 +30,8 @@ import com.google.android.material.tabs.TabLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -70,6 +72,10 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
     SimpleExoPlayer exoPlayer;
     FrameLayout nowPlayingFrame;
     LinearLayout playerControlLinear;
+    ConstraintLayout fullScreenLayout;
+    RecyclerView playListRecycler;
+
+    TextView textDuration, textProgress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,11 +102,17 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
         btnPauseFull = findViewById(R.id.btnPauseFull);
         btnNextFull = findViewById(R.id.btnNextFull);
         progressBarRound = findViewById(R.id.progressBarRound);
+        fullScreenLayout = findViewById(R.id.fullScreenLayout);
+        playListRecycler = findViewById(R.id.playListRecycler);
+
+        textDuration = findViewById(R.id.textDuration);
+        textProgress = findViewById(R.id.textProgress);
 
         textViewSub.setSelected(true);
         textViewTitle.setSelected(true);
         progressBar.setIndeterminate(false);
         progressBar.setProgress(50);
+        progressBarRound.setScaleX(-1f);
 
         bottom_sheet = findViewById(R.id.bottom_sheet);
         sheetBehavior = BottomSheetBehavior.from(bottom_sheet);
@@ -169,7 +181,15 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
         sheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
-
+                if (newState == BottomSheetBehavior.STATE_EXPANDED) {
+                    nowPlayingFrame.setVisibility(View.GONE);
+                    fullScreenLayout.setVisibility(View.VISIBLE);
+                } else {
+                    if (newState != BottomSheetBehavior.STATE_DRAGGING) {
+                        nowPlayingFrame.setVisibility(View.VISIBLE);
+                        fullScreenLayout.setVisibility(View.GONE);
+                    }
+                }
             }
 
             @Override
@@ -296,8 +316,10 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
                 updateWidgetMetaData(title, subTitle, photoURI);
 
                 long seconds = TimeUnit.MILLISECONDS.toSeconds(musicPlayerService.playerInstance().getDuration());
+                String totalDur = Util.convertToTime(String.valueOf(TimeUnit.SECONDS.toMillis(seconds)));
                 progressBar.setMax((int) seconds);
                 progressBarRound.setMax((int) seconds);
+                textDuration.setText(totalDur);
                 //Log.d("this", seconds+"");
             }
 
@@ -340,7 +362,7 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
                     @Override
                     public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
                         albumArt.setImageBitmap(resource);
-                        albumArtRound.setImageBitmap(resource);
+                        albumArtRound.setImageBitmap(Util.convertToHeart(HomeActivity.this, resource));
                     }
 
                     @Override
@@ -442,7 +464,8 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
             //Log.e("Position::", String.valueOf(currentPosition));
             progressBar.setProgress((int) currentPosition);
             progressBarRound.setProgress((int) currentPosition);
-            //txtProgress.setText(Util.formatDurationForPlayer(currentPosition));
+            String curProgress = Util.convertToTime(String.valueOf(TimeUnit.SECONDS.toMillis(currentPosition)));
+            textProgress.setText(curProgress);
             handler.postDelayed(this, DELAY_MS);
         }
 

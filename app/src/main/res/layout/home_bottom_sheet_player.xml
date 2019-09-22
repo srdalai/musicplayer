@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/bottom_sheet"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -9,7 +10,10 @@
     android:elevation="9dp"
     app:behavior_hideable="false"
     app:behavior_peekHeight="80dp"
-    app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
+    android:clickable="true"
+    app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+    android:focusable="true"
+    android:animateLayoutChanges="true">
 
     <FrameLayout
         android:id="@+id/nowPlayingFrame"
@@ -130,11 +134,12 @@
     </FrameLayout>
 
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/fullScreenLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
         <ImageView
-            android:id="@+id/fullScreenLayout"
+            android:id="@+id/fullScreenImage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#ECEBEB"
@@ -144,126 +149,130 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <RelativeLayout
-            android:id="@+id/relativeLayout"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/player_one_bg"
-            app:layout_constraintBottom_toBottomOf="parent"
+        <ImageView
+            android:id="@+id/albumArtRound"
+            android:layout_width="200dp"
+            android:layout_height="200dp"
+            android:layout_marginBottom="25dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintBottom_toBottomOf="@id/progressBarRound"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+            app:srcCompat="@drawable/album_art" />
+
+        <me.tankery.lib.circularseekbar.CircularSeekBar
+            android:id="@+id/progressBarRound"
+            android:layout_width="250dp"
+            android:layout_height="250dp"
+            android:layout_marginTop="40dp"
+            app:cs_circle_color="#C8C8C8"
+            app:cs_circle_fill="#00000000"
+            app:cs_circle_progress_color="@color/colorAccent"
+            app:cs_circle_stroke_width="8dp"
+            app:cs_circle_style="round"
+            app:cs_end_angle="180"
+            app:cs_max="100"
+            app:cs_pointer_color="#FFFFFF"
+            app:cs_pointer_stroke_width="16dp"
+            app:cs_progress="50"
+            app:cs_start_angle="0"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/textProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="@id/progressBarRound"
+            app:layout_constraintCircle="@id/progressBarRound"
+            app:layout_constraintCircleAngle="278"
+            app:layout_constraintCircleRadius="136dp"
+            app:layout_constraintEnd_toStartOf="@id/progressBarRound" />
+
+
+        <TextView
+            android:id="@+id/textDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="05:32"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="@id/progressBarRound"
+            app:layout_constraintCircle="@id/progressBarRound"
+            app:layout_constraintCircleAngle="82"
+            app:layout_constraintCircleRadius="136dp"
+            app:layout_constraintStart_toEndOf="@id/progressBarRound" />
+
+        <LinearLayout
+            android:id="@+id/controlsLinear"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="40dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/progressBarRound">
 
             <ImageView
-                android:id="@+id/albumArtRound"
-                android:layout_width="200dp"
-                android:layout_height="200dp"
-                android:layout_centerInParent="true"
-                android:scaleType="centerCrop"
-                app:srcCompat="@drawable/album_art" />
+                android:id="@+id/btnSwitchVideo"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="20dp"
+                android:padding="8dp"
+                app:srcCompat="@drawable/ic_movie" />
 
-            <me.tankery.lib.circularseekbar.CircularSeekBar
-                android:id="@+id/progressBarRound"
-                android:layout_width="250dp"
-                android:layout_height="250dp"
-                android:layout_centerInParent="true"
-                app:cs_circle_color="#C8C8C8"
-                app:cs_circle_fill="#00000000"
-                app:cs_circle_progress_color="@color/colorAccent"
-                app:cs_circle_stroke_width="8dp"
-                app:cs_circle_style="round"
-                app:cs_end_angle="50"
-                app:cs_max="100"
-                app:cs_pointer_color="#FFFFFF"
-                app:cs_pointer_stroke_width="16dp"
-                app:cs_progress="50"
-                app:cs_start_angle="130" />
+            <ImageView
+                android:id="@+id/btnPrevFull"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                app:srcCompat="@drawable/ic_skip_previous_black_24dp" />
 
-            <LinearLayout
-                android:layout_width="180dp"
-                android:layout_height="wrap_content"
-                android:layout_below="@id/progressBarRound"
-                android:layout_centerHorizontal="true"
-                android:layout_marginTop="-20dp"
-                android:orientation="horizontal">
+            <ImageView
+                android:id="@+id/btnPlayFull"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="20dp"
+                android:layout_marginEnd="20dp"
+                app:srcCompat="@drawable/ic_play_circle_filled_black_24dp" />
 
-                <TextView
-                    android:id="@+id/textProgress"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="start"
-                    android:text="00:00"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/btnPauseFull"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="20dp"
+                android:layout_marginEnd="20dp"
+                android:visibility="gone"
+                app:srcCompat="@drawable/ic_pause_circle_filled_black_24dp" />
 
-                <TextView
-                    android:id="@+id/textDuration"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="end"
-                    android:text="05:32"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/btnNextFull"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                app:srcCompat="@drawable/ic_skip_next_black_24dp" />
 
-            </LinearLayout>
+            <ImageView
+                android:id="@+id/btnPlaylist"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="20dp"
+                android:padding="8dp"
+                app:srcCompat="@drawable/ic_queue_music" />
+        </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:layout_below="@id/albumArtRound"
-                android:layout_centerHorizontal="true"
-                android:layout_marginTop="40dp"
-                android:gravity="center"
-                android:orientation="horizontal">
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/playListRecycler"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/controlsLinear" />
 
-                <ImageView
-                    android:id="@+id/btnSwitchVideo"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_marginEnd="20dp"
-                    android:padding="8dp"
-                    app:srcCompat="@drawable/ic_movie" />
-
-                <ImageView
-                    android:id="@+id/btnPrevFull"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    app:srcCompat="@drawable/ic_skip_previous_black_24dp" />
-
-                <ImageView
-                    android:id="@+id/btnPlayFull"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="20dp"
-                    android:layout_marginEnd="20dp"
-                    app:srcCompat="@drawable/ic_play_circle_filled_black_24dp" />
-
-                <ImageView
-                    android:id="@+id/btnPauseFull"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="20dp"
-                    android:layout_marginEnd="20dp"
-                    app:srcCompat="@drawable/ic_pause_circle_filled_black_24dp"
-                    android:visibility="gone" />
-
-                <ImageView
-                    android:id="@+id/btnNextFull"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    app:srcCompat="@drawable/ic_skip_next_black_24dp" />
-
-                <ImageView
-                    android:id="@+id/btnPlaylist"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="20dp"
-                    android:padding="8dp"
-                    app:srcCompat="@drawable/ic_queue_music" />
-            </LinearLayout>
-        </RelativeLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </LinearLayout>

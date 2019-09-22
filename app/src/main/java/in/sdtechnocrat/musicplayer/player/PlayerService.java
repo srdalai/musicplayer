@@ -1,17 +1,18 @@
 package in.sdtechnocrat.musicplayer.player;
 
-import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.app.TaskStackBuilder;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
-import android.media.MediaMetadataRetriever;
 import android.media.session.MediaSessionManager;
 import android.net.Uri;
 import android.os.Binder;
@@ -23,14 +24,14 @@ import android.provider.MediaStore;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
 import android.util.Log;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
-import androidx.core.content.FileProvider;
 
-import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
@@ -41,7 +42,6 @@ import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.extractor.ExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
-import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.source.TrackGroupArray;
@@ -58,9 +58,9 @@ import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import in.sdtechnocrat.musicplayer.R;
+import in.sdtechnocrat.musicplayer.activity.HomeActivity;
 import in.sdtechnocrat.musicplayer.model.CustomMetadata;
 import in.sdtechnocrat.musicplayer.model.SongData;
 import in.sdtechnocrat.musicplayer.utils.Util;
@@ -72,7 +72,6 @@ import static in.sdtechnocrat.musicplayer.utils.Util.ACTION_PREVIOUS;
 import static in.sdtechnocrat.musicplayer.utils.Util.ACTION_STOP;
 import static in.sdtechnocrat.musicplayer.utils.Util.Broadcast_REBUILD_WIDGET;
 import static in.sdtechnocrat.musicplayer.utils.Util.NOTIFICATION_ID;
-import static in.sdtechnocrat.musicplayer.utils.Util.fileUri;
 import static in.sdtechnocrat.musicplayer.utils.Util.playbackState;
 
 public class PlayerService extends Service implements AudioManager.OnAudioFocusChangeListener {
@@ -88,6 +87,11 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
     private MediaSessionCompat mediaSession;
     private MediaControllerCompat.TransportControls transportControls;
 
+    //Handle incoming phone calls
+    private boolean ongoingCall = false;
+    private PhoneStateListener phoneStateListener;
+    private TelephonyManager telephonyManager;
+
     ExtractorsFactory extractorsFactory;
     DataSource.Factory dateSourceFactory;
     ConcatenatingMediaSource concatenatedSource;
@@ -95,6 +99,39 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
 
 
     public PlayerService() {
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        callStateListener();
+        //ACTION_AUDIO_BECOMING_NOISY -- change in audio outputs -- BroadcastReceiver
+        registerBecomingNoisyReceiver();
+        extractorsFactory = new DefaultExtractorsFactory();
+        dateSourceFactory = new DefaultDataSourceFactory(this, null, new DefaultHttpDataSourceFactory(getUserAgent(this), null));
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        if (mediaSessionManager == null) {
+            try {
+                initMediaSession();
+                //initMediaPlayer();
+            } catch (RemoteException e) {
+                e.printStackTrace();
+                stopSelf();
+            }
+            buildPersistNotification();
+        }
+        //Request audio focus
+        if (!requestAudioFocus()) {
+            //Could not gain focus
+            stopSelf();
+        }
+        //Handle Intent action from MediaSession.TransportControls
+        handleIncomingActions(intent);
+        return START_STICKY;
     }
 
     @Override
@@ -153,45 +190,10 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
             return 0;
     }
 
-    public SongData getCurrentSongMetaData() {
-        return Util.currentSong;
-    }
-
-    @Override
-    public void onAudioFocusChange(int i) {
-
-    }
-
     public class LocalBinder extends Binder {
         public PlayerService getService() {
             return PlayerService.this;
         }
-    }
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        extractorsFactory = new DefaultExtractorsFactory();
-        dateSourceFactory = new DefaultDataSourceFactory(this, null, new DefaultHttpDataSourceFactory(getUserAgent(this), null));
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        //buildPersistNotification(PlaybackStatus.PAUSED);
-
-        if (mediaSessionManager == null) {
-            try {
-                initMediaSession();
-                //initMediaPlayer();
-            } catch (RemoteException e) {
-                e.printStackTrace();
-                stopSelf();
-            }
-            buildPersistNotification();
-        }
-        //Handle Intent action from MediaSession.TransportControls
-        handleIncomingActions(intent);
-        return START_STICKY;
     }
 
     private void prepareMedia() {
@@ -211,7 +213,7 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
         buildNotification();
     }
 
-    public MediaSource prepareMediaSource() {
+    public void prepareMediaSource() {
         SongData songData = Util.currentSong;
         MediaSource mediaSource;
         if (Util.playbackType == Util.PLAYBACK_TYPE.VIDEO) {
@@ -220,15 +222,13 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
             mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(Uri.parse(Util.currentSong.getData()));
         }
         Util.playListMetadata = new ArrayList<>();
-        CustomMetadata customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist() + " - " + songData.getAlbum(), songData.getAlbumArt());
+        CustomMetadata customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist(), songData.getAlbum(), songData.getAlbumArt());
         Util.playListMetadata.add(customMetadata);
-
+        Util.currentCustomMetadata = customMetadata;
 
         concatenatedSource = new ConcatenatingMediaSource(mediaSource);
-        return mediaSource;
+        //return mediaSource;
     }
-
-
 
     public void addItem(SongData songData) {
         Uri uri = Uri.parse(songData.getData());
@@ -237,9 +237,8 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
         } else {
             position++;
         }
-        CustomMetadata customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist() + " - " + songData.getAlbum(), songData.getAlbumArt());
+        CustomMetadata customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist(), songData.getAlbum(), songData.getAlbumArt());
         Util.playListMetadata.add(customMetadata);
-        Util.currentCustomMetadata = customMetadata;
         // Add mediaId (e.g. uri) as tag to the MediaSource.
         MediaSource mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(uri);
         concatenatedSource.addMediaSource(mediaSource);
@@ -254,7 +253,16 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
     @Override
     public void onDestroy() {
         releasePlayer();
-        Log.d("SATYA", "Player Destroyed");
+        removeAudioFocus();
+
+        //Disable the PhoneStateListener
+        if (phoneStateListener != null) {
+            telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
+        }
+        removeNotification();
+
+        //unregister BroadcastReceivers
+        unregisterReceiver(becomingNoisyReceiver);
         super.onDestroy();
     }
 
@@ -322,6 +330,7 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
         public void onPositionDiscontinuity(int reason) {
             Util.currentCustomMetadata = Util.playListMetadata.get((Integer) exoPlayer.getCurrentTag());
             notifyPlayerChangeListeners();
+            buildNotification();
         }
 
         @Override
@@ -335,7 +344,7 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
     };
 
     public interface MusicPlayerListener {
-        public void onPlayerStatusChanged();
+        void onPlayerStatusChanged();
     }
 
     public void registerListener(MusicPlayerListener listener) {
@@ -383,13 +392,17 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
                 // Previous track
                 playbackAction.setAction(ACTION_PREVIOUS);
                 return PendingIntent.getService(this, actionNumber, playbackAction, 0);
+            case 4:
+                // Stop playback, remove notification, stop service
+                playbackAction.setAction(ACTION_STOP);
+                return PendingIntent.getService(this, actionNumber, playbackAction, 0);
             default:
                 break;
         }
         return null;
     }
 
-    private void notifyChnageToRebuildWidget(String action) {
+    private void notifyChangeToRebuildWidget(String action) {
         Log.d("Action", action);
         Intent broadcastIntent = new Intent(Broadcast_REBUILD_WIDGET);
         broadcastIntent.putExtra("action", action);
@@ -402,19 +415,79 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
         String actionString = playbackAction.getAction();
         if (actionString.equalsIgnoreCase(ACTION_PLAY)) {
             transportControls.play();
-            notifyChnageToRebuildWidget("play");
+            notifyChangeToRebuildWidget("play");
         } else if (actionString.equalsIgnoreCase(ACTION_PAUSE)) {
             transportControls.pause();
-            notifyChnageToRebuildWidget("pause");
+            notifyChangeToRebuildWidget("pause");
         } else if (actionString.equalsIgnoreCase(ACTION_NEXT)) {
             transportControls.skipToNext();
-            notifyChnageToRebuildWidget("play_next");
+            notifyChangeToRebuildWidget("play_next");
         } else if (actionString.equalsIgnoreCase(ACTION_PREVIOUS)) {
             transportControls.skipToPrevious();
-            notifyChnageToRebuildWidget("play_prev");
+            notifyChangeToRebuildWidget("play_prev");
         } else if (actionString.equalsIgnoreCase(ACTION_STOP)) {
             transportControls.stop();
         }
+    }
+
+    private void registerBecomingNoisyReceiver() {
+        //register after getting audio focus
+        IntentFilter intentFilter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+        registerReceiver(becomingNoisyReceiver, intentFilter);
+    }
+
+    //Handle incoming phone calls
+    private void callStateListener() {
+        // Get the telephony manager
+        telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+        //Starting listening for PhoneState changes
+        phoneStateListener = new PhoneStateListener() {
+            @Override
+            public void onCallStateChanged(int state, String phoneNumber) {
+                switch (state) {
+                    //if at least one call exists or the phone is ringing
+                    //pause the MediaPlayer
+                    case TelephonyManager.CALL_STATE_OFFHOOK:
+                    case TelephonyManager.CALL_STATE_RINGING:
+                        pause();
+                        ongoingCall = true;
+                        break;
+                    case TelephonyManager.CALL_STATE_IDLE:
+                        // Phone idle. Start playing.
+                        if (ongoingCall) {
+                            ongoingCall = false;
+                            pause();
+                        }
+                        break;
+                }
+            }
+        };
+
+        // Register the listener with the telephony manager
+        // Listen for changes to the device call state.
+        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+    }
+
+    //Becoming noisy
+    private BroadcastReceiver becomingNoisyReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            //pause audio on ACTION_AUDIO_BECOMING_NOISY
+            pause();
+            buildNotification();
+        }
+    };
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        stopSelf();
+        Log.e("stopservice","stopServices");
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        super.onTaskRemoved(rootIntent);
     }
 
     private void initMediaSession() throws RemoteException {
@@ -423,9 +496,14 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
         mediaSession = new MediaSessionCompat(getApplicationContext(), "AudioPlayer");
         transportControls = mediaSession.getController().getTransportControls();
         mediaSession.setActive(true);
-        mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
+        mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS | MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
 
         //updateMetaData();
+        PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder()
+                .setActions(
+                        PlaybackStateCompat.ACTION_PLAY |
+                                PlaybackStateCompat.ACTION_PLAY_PAUSE);
+        mediaSession.setPlaybackState(stateBuilder.build());
 
         mediaSession.setCallback(new MediaSessionCompat.Callback() {
             @Override
@@ -443,17 +521,17 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
             @Override
             public void onSkipToNext() {
                 super.onSkipToNext();
-                //skipToNext();
+                exoPlayer.next();
                 //updateMetaData();
-                //buildNotification(PlaybackStatus.PLAYING);
+                buildNotification();
             }
 
             @Override
             public void onSkipToPrevious() {
                 super.onSkipToPrevious();
-                //skipToPrevious();
+                exoPlayer.previous();
                 //updateMetaData();
-                //buildNotification(PlaybackStatus.PLAYING);
+                buildNotification();
             }
 
             @Override
@@ -461,7 +539,9 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
                 super.onStop();
                 removeNotification();
                 //Stop the service
+                exoPlayer.release();
                 stopSelf();
+                System.exit(0);
             }
 
             @Override
@@ -525,15 +605,12 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
         String artist = "", album = "", title = "";
 
         Bitmap largeIcon = null;
-        if (Util.currentSong == null || Util.currentSong.getAlbumArt().equals("") || Util.currentSong.getAlbumArt() == null) {
+        if (Util.currentCustomMetadata == null || Util.currentCustomMetadata.getThumbImagePath().equals("") || Util.currentCustomMetadata.getThumbImagePath() == null) {
             largeIcon = BitmapFactory.decodeResource(getResources(),
                     R.drawable.album_art); //TODO replace with medias album_art
         } else {
-            Uri imageUri = Uri.parse(Util.currentSong.getAlbumArt());
-            File file = new File(Util.currentSong.getAlbumArt());
+            File file = new File(Util.currentCustomMetadata.getThumbImagePath());
             Uri photoURI = Uri.fromFile(file);
-            Log.d("TAG", "buildNotification: => " + imageUri);
-            Log.d("TAG", "buildNotification: => " + photoURI);
             try {
                 largeIcon = MediaStore.Images.Media.getBitmap(this.getContentResolver(), photoURI);
             } catch (IOException e) {
@@ -541,10 +618,10 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
             }
         }
 
-        if (Util.currentSong != null) {
-            artist = Util.currentSong.getArtist();
-            album = Util.currentSong.getAlbum();
-            title = Util.currentSong.getTitle();
+        if (Util.currentCustomMetadata != null) {
+            artist = Util.currentCustomMetadata.getArtist();
+            album = Util.currentCustomMetadata.getAlbum();
+            title = Util.currentCustomMetadata.getTitle();
         }
 
         // Create a new Notification
@@ -559,14 +636,52 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
                 .setContentText(artist)
                 .setContentTitle(title)
                 .setContentInfo(album)
+                .setSubText(album)
                 .addAction(R.drawable.ic_skip_previous_black_24dp, "previous", playbackAction(3))
                 .addAction(notificationAction, "pause", play_pauseAction)
-                .addAction(R.drawable.ic_skip_next_black_24dp, "next", playbackAction(2));
+                .addAction(R.drawable.ic_skip_next_black_24dp, "next", playbackAction(2))
+                .addAction(R.drawable.ic_close, "stop", playbackAction(4));
 
         notificationBuilder.setDefaults(0);
+        Intent notifyIntent = new Intent(this, HomeActivity.class);
+        notifyIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent notifyPendingIntent = PendingIntent.getActivity(
+                this, 0, notifyIntent, PendingIntent.FLAG_UPDATE_CURRENT
+        );
+        notificationBuilder.setContentIntent(notifyPendingIntent);
 
         //((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(NOTIFICATION_ID, notificationBuilder.build());
 
         startForeground(NOTIFICATION_ID, notificationBuilder.build());
+    }
+
+    @Override
+    public void onAudioFocusChange(int focusState) {
+        //Invoked when the audio focus of the system is updated.
+        switch (focusState) {
+            case AudioManager.AUDIOFOCUS_GAIN:
+                // resume playback
+                play();
+                exoPlayer.setVolume(1.0f);
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS:
+                // Lost focus for an unbounded amount of time: stop playback and release media player
+                //removeNotification();
+                //stopSelf();
+                pause();
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                // Lost focus for a short time, but we have to stop
+                // playback. We don't release the media player because playback
+                // is likely to resume
+                pause();
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                // Lost focus for a short time, but it's ok to keep playing
+                // at an attenuated level
+                exoPlayer.setVolume(0.1f);
+                break;
+        }
     }
 }
