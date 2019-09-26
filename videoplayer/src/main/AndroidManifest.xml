@@ -14,7 +14,10 @@
     </dist:module>
 
     <application>
-        <activity android:name=".VideoPlayer" />
+        <activity android:name=".VideoPlayer"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"/>
     </application>
 
 </manifest>

@@ -164,16 +164,16 @@
             android:id="@+id/progressBarRound"
             android:layout_width="250dp"
             android:layout_height="250dp"
-            android:layout_marginTop="40dp"
-            app:cs_circle_color="#C8C8C8"
+            android:layout_marginTop="32dp"
+            app:cs_circle_color="#373C3E"
             app:cs_circle_fill="#00000000"
-            app:cs_circle_progress_color="@color/colorAccent"
-            app:cs_circle_stroke_width="8dp"
+            app:cs_circle_progress_color="@color/secondaryAccent"
+            app:cs_circle_stroke_width="6dp"
             app:cs_circle_style="round"
             app:cs_end_angle="180"
             app:cs_max="100"
-            app:cs_pointer_color="#FFFFFF"
-            app:cs_pointer_stroke_width="16dp"
+            app:cs_pointer_color="@color/secondaryAccent"
+            app:cs_pointer_stroke_width="10dp"
             app:cs_progress="50"
             app:cs_start_angle="0"
             app:layout_constraintEnd_toEndOf="parent"
@@ -207,30 +207,59 @@
             app:layout_constraintCircleRadius="136dp"
             app:layout_constraintStart_toEndOf="@id/progressBarRound" />
 
+        <TextView
+            android:id="@+id/textTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Title"
+            android:textColor="#000"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/progressBarRound" />
+
+        <TextView
+            android:id="@+id/textArtist"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Artist"
+            android:textSize="16sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/textTitle" />
+
         <LinearLayout
             android:id="@+id/controlsLinear"
             android:layout_width="match_parent"
             android:layout_height="60dp"
-            android:layout_marginTop="40dp"
+            android:layout_marginTop="24dp"
             android:gravity="center"
             android:orientation="horizontal"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/progressBarRound">
+            app:layout_constraintTop_toBottomOf="@id/textArtist">
 
             <ImageView
                 android:id="@+id/btnSwitchVideo"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_marginEnd="20dp"
-                android:padding="8dp"
-                app:srcCompat="@drawable/ic_movie" />
+                android:padding="10dp"
+                app:srcCompat="@drawable/ic_play_video_outlined" />
 
             <ImageView
                 android:id="@+id/btnPrevFull"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                app:srcCompat="@drawable/ic_skip_previous_black_24dp" />
+                android:padding="10dp"
+                app:srcCompat="@drawable/ic_previous_outlined" />
 
             <ImageView
                 android:id="@+id/btnPlayFull"
@@ -238,7 +267,8 @@
                 android:layout_height="56dp"
                 android:layout_marginStart="20dp"
                 android:layout_marginEnd="20dp"
-                app:srcCompat="@drawable/ic_play_circle_filled_black_24dp" />
+                android:padding="8dp"
+                app:srcCompat="@drawable/ic_play_outlined" />
 
             <ImageView
                 android:id="@+id/btnPauseFull"
@@ -246,22 +276,24 @@
                 android:layout_height="56dp"
                 android:layout_marginStart="20dp"
                 android:layout_marginEnd="20dp"
+                android:padding="8dp"
                 android:visibility="gone"
-                app:srcCompat="@drawable/ic_pause_circle_filled_black_24dp" />
+                app:srcCompat="@drawable/ic_pause_outlined" />
 
             <ImageView
                 android:id="@+id/btnNextFull"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                app:srcCompat="@drawable/ic_skip_next_black_24dp" />
+                android:padding="10dp"
+                app:srcCompat="@drawable/ic_next_outlined" />
 
             <ImageView
                 android:id="@+id/btnPlaylist"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_marginStart="20dp"
-                android:padding="8dp"
-                app:srcCompat="@drawable/ic_queue_music" />
+                android:padding="10dp"
+                app:srcCompat="@drawable/ic_playlist_outlined" />
         </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView

@@ -72,9 +72,8 @@ public class VideoListFragment extends Fragment {
                     Toast.makeText(requireContext(), videoData.getFileName(), Toast.LENGTH_SHORT).show();
                     Util.currentVideo = videoDataList.get(position);
 
-                    Util.playbackType = Util.PLAYBACK_TYPE.VIDEO;
                     if (requireContext() instanceof HomeActivity) {
-                        ((HomeActivity) requireContext()).playSong();
+                        ((HomeActivity) requireContext()).playOrQueueVideo(videoData);
                     }
                 }
 
@@ -173,21 +172,21 @@ public class VideoListFragment extends Fragment {
             int count = videocursor.getCount();
             Log.d("No of video", "" + count);
             for (int i = 0; i < count; i++) {
-                VideoData mediaFileInfo = new VideoData();
+                VideoData videoData = new VideoData();
                 video_column_index = videocursor
                         .getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME);
                 videocursor.moveToPosition(i);
                 name = videocursor.getString(video_column_index);
 
-                mediaFileInfo.setFileName(name);
+                videoData.setContentTitle(name);
 
                 int column_index = videocursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
                 videocursor.moveToPosition(i);
                 String filepath = videocursor.getString(column_index);
 
-                mediaFileInfo.setFileName(filepath);
+                videoData.setFileName(filepath);
                 //mediaFileInfo.setFileType(type);
-                videoDataList.add(mediaFileInfo);
+                videoDataList.add(videoData);
                 // id += " Size(KB):" +
                 // videocursor.getString(video_column_index);
 

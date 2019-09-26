@@ -5,6 +5,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.graphics.PathParser;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -12,6 +14,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.Path;
 import android.graphics.RectF;
@@ -31,6 +34,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.google.android.exoplayer2.Player;
@@ -47,9 +51,12 @@ import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 import in.sdtechnocrat.musicplayer.R;
+import in.sdtechnocrat.musicplayer.adapter.PlaylistAdapter;
 import in.sdtechnocrat.musicplayer.model.SongData;
+import in.sdtechnocrat.musicplayer.model.VideoData;
 import in.sdtechnocrat.musicplayer.player.PlayerService;
 import in.sdtechnocrat.musicplayer.utils.BitmapUtils;
+import in.sdtechnocrat.musicplayer.utils.RecyclerTouchListener;
 import in.sdtechnocrat.musicplayer.utils.Util;
 import me.tankery.lib.circularseekbar.CircularSeekBar;
 
@@ -73,6 +80,9 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
     private int mySessionId;
     private boolean isVideoPlayerAvailable = false;
     SharedPreferences sharedPreferences;
+    RecyclerView playListRecycler;
+
+    PlaylistAdapter playlistAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,10 +103,17 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
         fullScreenLayout = findViewById(R.id.fullScreenLayout);
         btnSwitchVideo = findViewById(R.id.btnSwitchVideo);
         btnPlaylist = findViewById(R.id.btnPlaylist);
+        playListRecycler = findViewById(R.id.playListRecycler);
 
 
         rotation = AnimationUtils.loadAnimation(this, R.anim.rotate);
         rotation.setFillAfter(true);
+
+        playlistAdapter = new PlaylistAdapter(this, Util.playListMetadata);
+        RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(this);
+        playListRecycler.setLayoutManager(layoutManager);
+        playListRecycler.setAdapter(playlistAdapter);
+        playListRecycler.setNestedScrollingEnabled(false);
 
 
         btnPlay.setOnClickListener(view -> {
@@ -108,20 +125,11 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
         });
 
         btnNext.setOnClickListener(view -> {
-            /*if (!(currentIndex == songList.size() - 1)) {
-                modifyPlayer("play_next");
-                currentIndex++;
-                changeWidget();
-            }*/
-
+            musicPlayerService.playerInstance().next();
         });
 
         btnPrev.setOnClickListener(view -> {
-           /*if (!(currentIndex == 0)) {
-               modifyPlayer("play_prev");
-               currentIndex--;
-               changeWidget();
-           }*/
+           musicPlayerService.playerInstance().previous();
         });
 
         btnSwitchVideo.setOnClickListener((view -> {
@@ -131,6 +139,27 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
                 startActivity(intent);
             } else {
                 downloadDynamicModule();
+            }
+        }));
+
+        btnPlaylist.setOnClickListener((view) -> {
+            if (playListRecycler.getVisibility() == View.VISIBLE) {
+                playListRecycler.setVisibility(View.GONE);
+            } else {
+                playListRecycler.setVisibility(View.VISIBLE);
+            }
+        });
+
+        playListRecycler.addOnItemTouchListener(new RecyclerTouchListener(this, playListRecycler, new RecyclerTouchListener.ClickListener() {
+            @Override
+            public void onClick(View view, int position) {
+                int playlistPosn = Util.playListMetadata.get(position).getQueueNum();
+                musicPlayerService.playPosition(playlistPosn);
+            }
+
+            @Override
+            public void onLongClick(View view, int position) {
+
             }
         }));
 
@@ -212,13 +241,41 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
     public void changeWidget() {
         if (mBound) {
 
-            long seconds = TimeUnit.MILLISECONDS.toSeconds(musicPlayerService.playerInstance().getDuration());
-            progressBar.setMax((int) seconds);
-            String totalDur = Util.convertToTime(String.valueOf(TimeUnit.SECONDS.toMillis(seconds)));
-            Log.d("this", seconds+"");
-            textDuration.setText(totalDur);
+            if (playbackState != Util.PLAYBACK_STATE.NONE) {
+                playlistAdapter.notifyDataSetChanged();
 
-            progressTracker.purgeHandler();
+                Uri photoURI;
+                String title, subTitle;
+
+                if (Util.playbackType == Util.PLAYBACK_TYPE.VIDEO) {
+                    VideoData videoData = Util.currentVideo;
+                    photoURI = Uri.fromFile(new File(videoData.getFileName()));
+                    title = videoData.getContentTitle();
+                    subTitle = videoData.getContentTitle();
+                } else {
+                    SongData songData = Util.currentSong;
+                    photoURI = Uri.fromFile(new File(songData.getAlbumArt()));
+                    title = songData.getTitle();
+                    subTitle = songData.getArtist() + " - " + songData.getAlbum();
+                }
+
+                if (Util.currentCustomMetadata != null) {
+                    title = Util.currentCustomMetadata.getTitle();
+                    subTitle = Util.currentCustomMetadata.getSubTitle();
+                    photoURI = Uri.fromFile(new File(Util.currentCustomMetadata.getThumbImagePath()));
+                }
+                updateWidgetMetaData(title, subTitle, photoURI);
+
+                long seconds = TimeUnit.MILLISECONDS.toSeconds(musicPlayerService.playerInstance().getDuration());
+                progressBar.setMax((int) seconds);
+                String totalDur = Util.convertToTime(String.valueOf(TimeUnit.SECONDS.toMillis(seconds)));
+                Log.d("this", seconds+"");
+                textDuration.setText(totalDur);
+            }
+
+            if (progressTracker != null) {
+                progressTracker.purgeHandler();
+            }
 
             if (playbackState == Util.PLAYBACK_STATE.PLAYING) {
                 progressTracker = new ProgressTracker(musicPlayerService.playerInstance());
@@ -236,34 +293,29 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
                 btnPause.setVisibility(View.GONE);
             }
 
-            SongData currentSongData = Util.currentSong;
-
-
-            String fileName = "";
-            if (Util.playbackType == Util.PLAYBACK_TYPE.VIDEO) {
-                fileName = Util.currentVideo.getFileName();
-            } else {
-                fileName = currentSongData.getAlbumArt();
-            }
-            File file = new File(fileName);
-            Uri photoURI = Uri.fromFile(file);
-            updateWidgetMetaData(photoURI);
-
         }
     }
 
-    public void updateWidgetMetaData(Uri photoURI) {
+    public void updateWidgetMetaData(String title, String subTitle, Uri mediaUri) {
+        //textViewTitle.setText(title);
+        //textViewSub.setText(subTitle);
+        //textTitle.setText(title);
+        //textArtist.setText(subTitle);
+
+        Bitmap errorBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.album_art);
+        Drawable errorDrawable = new BitmapDrawable(getResources(), Util.convertToHeart(this, errorBitmap));
+
         Glide.with(this)
                 .asBitmap()
-                .load(photoURI)
-                .error(R.drawable.album_art)
-                .placeholder(R.drawable.album_art)
+                .load(mediaUri)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .error(errorDrawable)
+                .placeholder(errorDrawable)
                 .into(new CustomTarget<Bitmap>() {
                     @Override
                     public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
                         albumArt.setImageBitmap(convertToHeart(resource));
-                        fullScreenLayout.setImageBitmap(resource);
-
+                        //fullScreenLayout.setImageBitmap(resource);
                     }
 
                     @Override
@@ -271,10 +323,7 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
 
                     }
                 });
-
     }
-
-
 
     public class ProgressTracker implements Runnable {
 
@@ -300,6 +349,18 @@ public class NowPlayingActivityOne extends AppCompatActivity implements PlayerSe
 
         private void purgeHandler() {
             handler.removeCallbacks(this);
+        }
+    }
+
+    public int getPlaylistPlayingPosition() {
+        if (mBound) {
+            try {
+                return (int) musicPlayerService.playerInstance().getCurrentTag();
+            } catch (Exception e) {
+                return 0;
+            }
+        } else {
+            return 0;
         }
     }
 

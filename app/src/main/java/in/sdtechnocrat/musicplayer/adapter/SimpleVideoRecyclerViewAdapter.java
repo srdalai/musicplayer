@@ -50,7 +50,7 @@ public class SimpleVideoRecyclerViewAdapter extends RecyclerView.Adapter<SimpleV
     @Override
     public void onBindViewHolder(final ViewHolder holder, int position) {
         VideoData data = videoDataList.get(position);
-        holder.mContentView.setText(data.getFileName());
+        holder.mContentView.setText(data.getContentTitle());
 
         Uri mediaUri = Uri.fromFile(new File(data.getFileName()));
         Glide.with(mContext)

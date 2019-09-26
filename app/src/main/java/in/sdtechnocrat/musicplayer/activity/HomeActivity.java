@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
@@ -31,6 +33,7 @@ import com.google.android.material.tabs.TabLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 import androidx.appcompat.app.AppCompatActivity;
@@ -39,6 +42,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
+import in.sdtechnocrat.musicplayer.adapter.PlaylistAdapter;
 import in.sdtechnocrat.musicplayer.model.VideoData;
 import in.sdtechnocrat.musicplayer.player.MediaPlayerService;
 import in.sdtechnocrat.musicplayer.R;
@@ -50,6 +54,7 @@ import in.sdtechnocrat.musicplayer.utils.Util;
 import me.tankery.lib.circularseekbar.CircularSeekBar;
 
 import static in.sdtechnocrat.musicplayer.utils.Util.playbackState;
+import static in.sdtechnocrat.musicplayer.utils.Util.playbackType;
 
 public class HomeActivity extends AppCompatActivity implements PlayerService.MusicPlayerListener {
 
@@ -61,7 +66,6 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
     ImageView albumArt, btnPrev, btnPlay, btnPause, btnNext;
     ImageView albumArtRound, btnPrevFull, btnPlayFull, btnPauseFull, btnNextFull;
     TextView textViewTitle, textViewSub;
-    SongData currentSongData = null;
     int currentIndex = 0;
     ProgressTracker progressTracker;
     BottomSheetBehavior sheetBehavior;
@@ -75,7 +79,8 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
     ConstraintLayout fullScreenLayout;
     RecyclerView playListRecycler;
 
-    TextView textDuration, textProgress;
+    TextView textDuration, textProgress, textTitle, textArtist;
+    PlaylistAdapter playlistAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,6 +112,8 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
 
         textDuration = findViewById(R.id.textDuration);
         textProgress = findViewById(R.id.textProgress);
+        textTitle = findViewById(R.id.textTitle);
+        textArtist = findViewById(R.id.textArtist);
 
         textViewSub.setSelected(true);
         textViewTitle.setSelected(true);
@@ -138,6 +145,11 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
         btnPlayFull.setVisibility(View.GONE);
         btnPauseFull.setVisibility(View.GONE);
 
+        playlistAdapter = new PlaylistAdapter(this, Util.playListMetadata);
+        RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(this);
+        playListRecycler.setLayoutManager(layoutManager);
+        playListRecycler.setAdapter(playlistAdapter);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(new Intent(this, PlayerService.class));
         } else {
@@ -162,17 +174,16 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
 
         btnPrevFull.setOnClickListener(view -> musicPlayerService.playerInstance().previous());
 
-        nowPlayingFrame.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (sheetBehavior.getState() != BottomSheetBehavior.STATE_EXPANDED) {
-                    sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-                } else {
-                    sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
-                }
-                //startActivity(new Intent(this, NowPlayingActivityOne.class));
-
+        nowPlayingFrame.setOnClickListener(view -> {
+            if (playbackState != Util.PLAYBACK_STATE.NONE && playbackState != Util.PLAYBACK_STATE.STOPPED) {
+                /*if (sheetBehavior.getState() != BottomSheetBehavior.STATE_EXPANDED) {
+                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            } else {
+                sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+            }*/
+                startActivity(new Intent(HomeActivity.this, NowPlayingActivityOne.class));
             }
+
         });
     }
 
@@ -181,13 +192,15 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
         sheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
-                if (newState == BottomSheetBehavior.STATE_EXPANDED) {
-                    nowPlayingFrame.setVisibility(View.GONE);
-                    fullScreenLayout.setVisibility(View.VISIBLE);
-                } else {
-                    if (newState != BottomSheetBehavior.STATE_DRAGGING) {
-                        nowPlayingFrame.setVisibility(View.VISIBLE);
-                        fullScreenLayout.setVisibility(View.GONE);
+                if (playbackState != Util.PLAYBACK_STATE.NONE && playbackState != Util.PLAYBACK_STATE.STOPPED) {
+                    if (newState == BottomSheetBehavior.STATE_EXPANDED) {
+                        nowPlayingFrame.setVisibility(View.GONE);
+                        fullScreenLayout.setVisibility(View.VISIBLE);
+                    } else {
+                        if (newState != BottomSheetBehavior.STATE_DRAGGING) {
+                            nowPlayingFrame.setVisibility(View.VISIBLE);
+                            fullScreenLayout.setVisibility(View.GONE);
+                        }
                     }
                 }
             }
@@ -243,12 +256,32 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
         }
     }
 
-    public void playSong() {
+    public void playOrQueueAudio(SongData songData) {
         if (playbackState == Util.PLAYBACK_STATE.NONE || playbackState == Util.PLAYBACK_STATE.STOPPED) {
+            Util.playbackType = Util.PLAYBACK_TYPE.AUDIO;
             musicPlayerService.play();
+        } else if (playbackType == Util.PLAYBACK_TYPE.VIDEO) {
+            Util.playbackType = Util.PLAYBACK_TYPE.AUDIO;
+            Util.currentSong = songData;
+            musicPlayerService.clearPlaylist();
         } else {
             //musicPlayerService.changeSong();
-            musicPlayerService.addItem(Util.currentSong);
+            musicPlayerService.addItem(songData);
+        }
+    }
+
+    public void playOrQueueVideo(VideoData videoData) {
+
+        if (playbackState == Util.PLAYBACK_STATE.NONE || playbackState == Util.PLAYBACK_STATE.STOPPED) {
+            Util.playbackType = Util.PLAYBACK_TYPE.VIDEO;
+            musicPlayerService.play();
+        } else if (playbackType == Util.PLAYBACK_TYPE.AUDIO) {
+            Util.playbackType = Util.PLAYBACK_TYPE.VIDEO;
+            Util.currentVideo = videoData;
+            musicPlayerService.clearPlaylist();
+        } else {
+            //musicPlayerService.changeSong();
+            musicPlayerService.addVideoToQueue(videoData);
         }
     }
 
@@ -289,9 +322,9 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
 
     public void changeWidget() {
         if (mBound) {
+            playlistAdapter.notifyDataSetChanged();
 
             if (playbackState != Util.PLAYBACK_STATE.NONE) {
-                currentSongData = Util.currentSong;
 
                 Uri photoURI;
                 String title, subTitle;
@@ -299,12 +332,13 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
                 if (Util.playbackType == Util.PLAYBACK_TYPE.VIDEO) {
                     VideoData videoData = Util.currentVideo;
                     photoURI = Uri.fromFile(new File(videoData.getFileName()));
-                    title = videoData.getFileName();
-                    subTitle = videoData.getFileName();
+                    title = videoData.getContentTitle();
+                    subTitle = videoData.getContentTitle();
                 } else {
-                    photoURI = Uri.fromFile(new File(currentSongData.getAlbumArt()));
-                    title = currentSongData.getTitle();
-                    subTitle = currentSongData.getArtist() + " - " + currentSongData.getAlbum();
+                    SongData songData = Util.currentSong;
+                    photoURI = Uri.fromFile(new File(songData.getAlbumArt()));
+                    title = songData.getTitle();
+                    subTitle = songData.getArtist() + " - " + songData.getAlbum();
                 }
 
                 if (Util.currentCustomMetadata != null) {
@@ -348,16 +382,33 @@ public class HomeActivity extends AppCompatActivity implements PlayerService.Mus
         }
     }
 
+    public int getPlaylistPlayingPosition() {
+        if (mBound) {
+            try {
+                return (int) musicPlayerService.playerInstance().getCurrentTag();
+            } catch (Exception e) {
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+    }
+
     public void updateWidgetMetaData(String title, String subTitle, Uri mediaUri) {
         textViewTitle.setText(title);
         textViewSub.setText(subTitle);
+        textTitle.setText(title);
+        textArtist.setText(subTitle);
+
+        Bitmap errorBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.album_art);
+        Drawable errorDrawable = new BitmapDrawable(getResources(), Util.convertToHeart(this, errorBitmap));
 
         Glide.with(this)
                 .asBitmap()
                 .load(mediaUri)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .error(R.drawable.ic_album_acent_24dp)
-                .placeholder(R.drawable.ic_album_acent_24dp)
+                .error(errorDrawable)
+                .placeholder(errorDrawable)
                 .into(new CustomTarget<Bitmap>() {
                     @Override
                     public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {

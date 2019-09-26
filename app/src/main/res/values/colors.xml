@@ -4,4 +4,5 @@
     <color name="colorPrimaryDark">#710883</color>
     <color name="colorAccent">#9C27B0</color>
     <color name="notificationShade">#7A7678</color>
+    <color name="secondaryAccent">#01F1FE</color>
 </resources>

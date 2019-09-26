@@ -63,6 +63,7 @@ import in.sdtechnocrat.musicplayer.R;
 import in.sdtechnocrat.musicplayer.activity.HomeActivity;
 import in.sdtechnocrat.musicplayer.model.CustomMetadata;
 import in.sdtechnocrat.musicplayer.model.SongData;
+import in.sdtechnocrat.musicplayer.model.VideoData;
 import in.sdtechnocrat.musicplayer.utils.Util;
 
 import static in.sdtechnocrat.musicplayer.utils.Util.ACTION_NEXT;
@@ -72,6 +73,7 @@ import static in.sdtechnocrat.musicplayer.utils.Util.ACTION_PREVIOUS;
 import static in.sdtechnocrat.musicplayer.utils.Util.ACTION_STOP;
 import static in.sdtechnocrat.musicplayer.utils.Util.Broadcast_REBUILD_WIDGET;
 import static in.sdtechnocrat.musicplayer.utils.Util.NOTIFICATION_ID;
+import static in.sdtechnocrat.musicplayer.utils.Util.playListMetadata;
 import static in.sdtechnocrat.musicplayer.utils.Util.playbackState;
 
 public class PlayerService extends Service implements AudioManager.OnAudioFocusChangeListener {
@@ -214,15 +216,18 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
     }
 
     public void prepareMediaSource() {
-        SongData songData = Util.currentSong;
         MediaSource mediaSource;
+        CustomMetadata customMetadata;
         if (Util.playbackType == Util.PLAYBACK_TYPE.VIDEO) {
-            mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(Uri.parse(Util.currentVideo.getFileName()));
+            VideoData videoData = Util.currentVideo;
+            mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(Uri.parse(videoData.getFileName()));
+            customMetadata = new CustomMetadata(position, videoData.getContentTitle(), videoData.getContentTitle(), videoData.getContentTitle(), videoData.getFileName());
         } else {
+            SongData songData = Util.currentSong;
             mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(Uri.parse(Util.currentSong.getData()));
+            customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist(), songData.getAlbum(), songData.getAlbumArt());
         }
         Util.playListMetadata = new ArrayList<>();
-        CustomMetadata customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist(), songData.getAlbum(), songData.getAlbumArt());
         Util.playListMetadata.add(customMetadata);
         Util.currentCustomMetadata = customMetadata;
 
@@ -238,10 +243,45 @@ public class PlayerService extends Service implements AudioManager.OnAudioFocusC
             position++;
         }
         CustomMetadata customMetadata = new CustomMetadata(position, songData.getTitle(), songData.getArtist(), songData.getAlbum(), songData.getAlbumArt());
-        Util.playListMetadata.add(customMetadata);
+        playListMetadata.add(customMetadata);
         // Add mediaId (e.g. uri) as tag to the MediaSource.
         MediaSource mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(uri);
         concatenatedSource.addMediaSource(mediaSource);
+    }
+
+    public void addVideoToQueue(VideoData videoData) {
+        Uri uri = Uri.parse(videoData.getFileName());
+        if (position == 0) {
+            position = 1;
+        } else {
+            position++;
+        }
+        CustomMetadata customMetadata = new CustomMetadata(position, videoData.getContentTitle(), videoData.getContentTitle(), videoData.getContentTitle(), videoData.getFileName());
+        playListMetadata.add(customMetadata);
+        // Add mediaId (e.g. uri) as tag to the MediaSource.
+        MediaSource mediaSource = new ProgressiveMediaSource.Factory(dateSourceFactory).setTag(position).createMediaSource(uri);
+        concatenatedSource.addMediaSource(mediaSource);
+    }
+
+    public void clearPlaylist() {
+        position = 0;
+        playbackState = Util.PLAYBACK_STATE.STOPPED;
+        releasePlayer();
+        prepareMedia();
+    }
+
+    public int getCurrentPlayingItemNum() {
+        return (int) exoPlayer.getCurrentTag();
+    }
+
+    public void playPosition(int index) {
+        exoPlayer.prepare(concatenatedSource.getMediaSource(index));
+        exoPlayer.setPlayWhenReady(true);
+        Util.playbackState = Util.PLAYBACK_STATE.PLAYING;
+        Util.currentCustomMetadata = playListMetadata.get(index);
+
+        notifyPlayerChangeListeners();
+        buildNotification();
     }
 
     private int millisecondsToString(int milliseconds) {

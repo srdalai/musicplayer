@@ -21,7 +21,7 @@ public class Util {
     public static String fileUri = "";
     public static SongData currentSong;
     public static VideoData currentVideo;
-    public static ArrayList<CustomMetadata> playListMetadata;
+    public static ArrayList<CustomMetadata> playListMetadata = new ArrayList<>();
     public static CustomMetadata currentCustomMetadata;
 
     public static PLAYBACK_STATE playbackState = PLAYBACK_STATE.NONE;

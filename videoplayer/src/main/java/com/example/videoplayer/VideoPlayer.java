@@ -1,5 +1,6 @@
 package com.example.videoplayer;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.ComponentName;
@@ -7,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -137,14 +139,13 @@ public class VideoPlayer extends AppCompatActivity implements PlayerService.Musi
                 btnPause.setVisibility(View.GONE);
             }
 
-            SongData currentSongData = Util.currentSong;
 
 
             String fileName = "";
             if (Util.playbackType == Util.PLAYBACK_TYPE.VIDEO) {
                 fileName = Util.currentVideo.getFileName();
             } else {
-                fileName = currentSongData.getAlbumArt();
+                fileName = Util.currentSong.getAlbumArt();
             }
             File file = new File(fileName);
             Uri photoURI = Uri.fromFile(file);
@@ -205,5 +206,17 @@ public class VideoPlayer extends AppCompatActivity implements PlayerService.Musi
         private void purgeHandler() {
             handler.removeCallbacks(this);
         }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    @Override
+    public void onUserLeaveHint () {
+        if (iWantToBeInPipModeNow()) {
+            enterPictureInPictureMode();
+        }
+    }
+
+    public boolean iWantToBeInPipModeNow() {
+        return true;
     }
 }
